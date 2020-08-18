@@ -29,6 +29,8 @@ debug = 'DEBUG' in os.environ
 use_reloader = os.environ.get('USE_RELOADER', '1') == '1'
 # Location of file path at which to write keyboard HID input.
 keyboard_path = os.environ.get('KEYBOARD_PATH', '/dev/hidg0')
+# Location of file path at which to write mouse HID input.
+mouse_path = os.environ.get('MOUSE_PATH', '/dev/hidg1')
 
 # Socket.io logs are too chatty at INFO level.
 if not debug:
@@ -58,6 +60,10 @@ def _parse_key_event(payload):
                                         key_code=payload['keyCode'])
 
 
+def _parse_mouse_move_event(payload):
+    return js_to_hid.JavaScriptMouseMoveEvent(x=payload['x'], y=payload['y'])
+
+
 @socketio.on('keystroke')
 def socket_keystroke(message):
     key_event = _parse_key_event(message)
@@ -82,6 +88,18 @@ def socket_keystroke(message):
         socketio.emit('keystroke-received', {'success': False})
         return
     socketio.emit('keystroke-received', {'success': True})
+
+
+@socketio.on('mouse-movement')
+def socket_mouse_movement(message):
+    mouse_move_event = _parse_mouse_move_event(message)
+    try:
+        hid.send_mouse_position(mouse_path, mouse_move_event.x,
+                                mouse_move_event.y)
+    except hid.WriteError:
+        # TODO
+        pass
+    socketio.emit('mouse-movement-received', {'success': True})
 
 
 @socketio.on('keyRelease')
